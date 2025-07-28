@@ -1,0 +1,36 @@
+FROM --platform=linux/amd64 python:3.9-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Download the model during build to ensure offline operation
+RUN python -c "from transformers import AutoTokenizer, AutoModelForSequenceClassification; \
+    model_name='distilbert-base-multilingual-cased'; \
+    AutoTokenizer.from_pretrained(model_name); \
+    AutoModelForSequenceClassification.from_pretrained(model_name)"
+
+# Copy the main script
+COPY main.py .
+
+# Create input and output directories
+RUN mkdir -p /app/input /app/output
+
+# Set Python path and run the script
+ENV PYTHONPATH=/app
+ENV TRANSFORMERS_OFFLINE=1
+ENV HF_DATASETS_OFFLINE=1
+
+# Run the PDF extractor
+CMD ["python", "main.py"]
